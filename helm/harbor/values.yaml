@@ -1,0 +1,31 @@
+expose:
+  type: ingress
+  ingress:
+    hosts:
+      core: harbor.nimbridge.local
+    className: nginx
+  tls:
+    enabled: false
+
+externalURL: http://harbor.nimbridge.local
+
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    registry:
+      size: 50Gi
+      storageClass: "standard"
+    database:
+      size: 5Gi
+      storageClass: "standard"
+    redis:
+      size: 2Gi
+      storageClass: "standard"
+
+harborAdminPassword: "Nimbridge2024!"
+
+database:
+  type: internal
+
+redis:
+  type: internal
