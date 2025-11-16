@@ -2,7 +2,6 @@
 
 <img src="Nimbridge.png" alt="Nimbridge Logo" width="400"/>
 
-# NIMBRIDGE
 
 **Hybrid Kubernetes + Azure GPU Platform for AI Inference**
 
