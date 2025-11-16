@@ -1,71 +1,149 @@
+<div align="center">
+
+<img src="Nimbridge.png" alt="Nimbridge Logo" width="400"/>
+
 # NIMBRIDGE
 
-Hybrid Kubernetes and Azure platform for AI inference using NVIDIA NIM models.
+**Hybrid Kubernetes + Azure GPU Platform for AI Inference**
+
+[![Azure](https://img.shields.io/badge/Azure-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io)
+[![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://nvidia.com)
+[![NIM](https://img.shields.io/badge/NIM-00A67E?style=for-the-badge&logo=nvidia&logoColor=white)](https://docs.nvidia.com/nim/)
+[![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://terraform.io)
+[![Harbor](https://img.shields.io/badge/Harbor-60B932?style=for-the-badge&logo=harbor&logoColor=white)](https://goharbor.io)
+
+*On-premise Kubernetes cluster connected to Azure GPU infrastructure for scalable AI model inference using NVIDIA NIM microservices*
+
+</div>
+
+---
+
+## Overview
+
+NIMBRIDGE demonstrates a modern hybrid cloud architecture:
+- **On-Premise**: Kubernetes cluster + Harbor registry (proxy-cache)
+- **Cloud**: Azure Container Registry + GPU Container Apps
+- **AI Models**: NVIDIA NIM (Llama3-8B) for inference
+
+**Use Case**: Run AI workloads locally while leveraging cloud GPU when needed, with intelligent image caching via Harbor.
+
+---
 
 ## Prerequisites
 
-- Debian/Ubuntu server with Kubernetes cluster (Kind, K3s, or similar)
-- Azure account (free tier works)
-- NVIDIA NGC account and API key (get one at https://ngc.nvidia.com)
-- Git and basic command line knowledge
+- Linux server with Kubernetes (Kind/K3s/native)
+- Azure account with free credits
+- NVIDIA NGC account ([sign up here](https://ngc.nvidia.com))
+- `kubectl`, `helm`, `docker` installed
 
-## Setup Steps
+---
 
-### 1. Setup Azure Infrastructure
+## Quick Start
 
-This creates the Azure Container Registry and Container Apps environment.
+### Step 1: Azure Infrastructure
+
+Creates Azure Container Registry and Container Apps environment.
 ```bash
 ./setup-azure.sh
 ```
 
-What it does:
-- Installs Azure CLI if needed
-- Authenticates with Azure
-- Registers required providers
-- Creates infrastructure with Terraform
+**Time**: 3-5 minutes | **Cost**: ~8€/month (idle)
 
-### 2. Push NVIDIA NIM Image to ACR
+### Step 2: Push NVIDIA NIM Model
 
-Get your NGC API key from https://ngc.nvidia.com, then:
+Requires NGC API key from https://ngc.nvidia.com
 ```bash
-export NGC_API_KEY="your-ngc-api-key"
+export NGC_API_KEY="your-key-here"
 ./push-nim-image.sh
 ```
 
-This pulls the Llama3-8B NIM model from NVIDIA and pushes it to your Azure Container Registry.
+**Time**: 5-10 minutes (large download)
 
-### 3. Deploy Harbor on Kubernetes
+### Step 3: Deploy Harbor
 
-Harbor acts as a proxy-cache for Docker Hub, NVIDIA NGC, and Azure ACR.
+Installs Harbor registry on your Kubernetes cluster.
 ```bash
 ./setup-harbor.sh
 ```
 
-Wait for all Harbor pods to be running:
-```bash
-kubectl get pods -n harbor
-```
+**Time**: 2-3 minutes
 
-### 4. Configure Harbor Registries
+### Step 4: Configure Proxy-Cache
 
-Once Harbor is running, configure the proxy-cache registries:
+Sets up Docker Hub, NVIDIA NGC, and Azure ACR endpoints in Harbor.
 ```bash
 ./configure-harbor.sh
 ```
 
-This configures three registries in Harbor:
-- Docker Hub
-- NVIDIA NGC
-- Azure Container Registry
+**Time**: 30 seconds
+
+---
+
+## Architecture
+```
+┌─────────────────────────────┐
+│   On-Premise Kubernetes     │
+│  ┌──────────┐               │
+│  │  Harbor  │ Proxy Cache   │
+│  └────┬─────┘               │
+└───────┼─────────────────────┘
+        │
+        ├─── Docker Hub
+        ├─── NVIDIA NGC
+        └─── Azure ACR
+                │
+        ┌───────▼──────────────┐
+        │   Azure Cloud        │
+        │  ┌────────────────┐  │
+        │  │ Container Apps │  │
+        │  │   GPU (NIM)    │  │
+        │  └────────────────┘  │
+        └──────────────────────┘
+```
+
+---
+
+## Verification
+
+**Check Azure resources:**
+```bash
+cd terraform && terraform output
+```
+
+**Check Harbor status:**
+```bash
+kubectl get pods -n harbor
+```
+
+**Test Harbor registries:**
+```bash
+kubectl run test --rm -it --image=curlimages/curl --restart=Never -- \
+  curl -u admin:Nimbridge2024! \
+  http://harbor-core.harbor.svc.cluster.local/api/v2.0/registries
+```
+
+---
+
+## What's Created
+
+| Component | Description | Location |
+|-----------|-------------|----------|
+| Azure Resource Group | Container for Azure resources | Cloud |
+| Azure Container Registry | Private Docker registry | Cloud |
+| Log Analytics | Monitoring and logs | Cloud |
+| Container App Environment | GPU runtime environment | Cloud |
+| Harbor Registry | Proxy-cache + image storage | On-Prem |
+
+---
 
 ## Project Structure
 ```
-Nimbridge/
-├── README.md
-├── setup-azure.sh           # Step 1: Azure infrastructure
-├── push-nim-image.sh        # Step 2: Push NIM image
-├── setup-harbor.sh          # Step 3: Deploy Harbor
-├── configure-harbor.sh      # Step 4: Configure registries
+nimbridge/
+├── setup-azure.sh          # Azure infrastructure
+├── push-nim-image.sh       # NVIDIA NIM image
+├── setup-harbor.sh         # Harbor deployment
+├── configure-harbor.sh     # Registry config
 ├── terraform/
 │   ├── main.tf
 │   ├── variables.tf
@@ -75,92 +153,68 @@ Nimbridge/
         └── values.yaml
 ```
 
-## What Gets Created
-
-### Azure Resources
-- Resource Group (rg-nimbridge)
-- Container Registry (acrnimbridge001)
-- Log Analytics Workspace
-- Container App Environment
-
-Estimated cost: ~8€/month when idle (covered by free credits)
-
-### Kubernetes Resources
-- Harbor registry (namespace: harbor)
-- 3 proxy-cache endpoints (Docker Hub, NGC, ACR)
+---
 
 ## Troubleshooting
 
-### Azure CLI installation fails
+**Azure CLI fails to install:**
 ```bash
 sudo rm -f /etc/apt/sources.list.d/azure-cli.sources
 sudo apt update
 ```
 
-### Provider registration hangs
+**Harbor pods stuck:**
+```bash
+kubectl get storageclass  # Verify storage class name
+# Update helm/harbor/values.yaml if needed
+```
+
+**Provider registration timeout:**
 ```bash
 az provider register --namespace Microsoft.App --wait
 ```
 
-### Harbor pods stuck in Pending
-Check your storage class:
-```bash
-kubectl get storageclass
-```
-
-Update `helm/harbor/values.yaml` with the correct storage class name.
-
-### Kind cluster port mapping
-If using Kind, ensure ports 80/443 are mapped in your cluster config.
-
-## Verification
-
-Check Azure resources:
-```bash
-cd terraform
-terraform output
-```
-
-Check Harbor status:
-```bash
-kubectl get pods -n harbor
-```
-
-Check Harbor registries:
-```bash
-kubectl run test --rm -it --image=curlimages/curl --restart=Never -- \
-  curl -u admin:Nimbridge2024! \
-  http://harbor-core.harbor.svc.cluster.local/api/v2.0/registries
-```
-
-## Next Steps
-
-The next phase involves:
-- Creating an API Gateway on Kubernetes
-- Deploying NVIDIA NIM to Azure Container Apps with GPU
-- Testing end-to-end AI inference
+---
 
 ## Cleanup
 
-Remove Harbor:
+**Remove Harbor:**
 ```bash
 helm uninstall harbor -n harbor
 kubectl delete namespace harbor
 ```
 
-Remove Azure resources:
+**Remove Azure resources:**
 ```bash
-cd terraform
-terraform destroy
+cd terraform && terraform destroy
 ```
 
-## Notes
+---
 
-- Harbor admin credentials: `admin` / `Nimbridge2024!`
-- All scripts are idempotent and can be re-run safely
-- Azure resources incur costs after free credits are exhausted
-- NVIDIA NIM images are large (several GB)
+## Credentials
+
+- **Harbor**: `admin` / `Nimbridge2024!`
+- **Azure ACR**: Auto-generated (from Terraform output)
+
+---
+
+## Next Steps
+
+- [ ] Deploy FastAPI gateway on Kubernetes
+- [ ] Create GPU Container App for NIM inference
+- [ ] End-to-end inference testing
+- [ ] Add monitoring with Prometheus/Grafana
+
+---
 
 ## License
 
-MIT
+MIT License - See [LICENSE](LICENSE) for details
+
+---
+
+<div align="center">
+
+**Built with** Terraform • Kubernetes • NVIDIA NIM • Azure • Harbor
+
+</div>
